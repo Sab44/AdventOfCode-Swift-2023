@@ -28,9 +28,6 @@ public protocol Puzzle<Input, OutputPartOne, OutputPartTwo> {
     /// The separator to use for the component separation
     static var componentsSeparator: InputSeparator { get }
 
-    static var partOneExpectations: [any Expectation<Input, OutputPartOne>] { get }
-    static var partTwoExpectations: [any Expectation<Input, OutputPartTwo>] { get }
-
     /// Should solve the first part of the puzzle
     static func solvePartOne(_ input: Input) async throws -> OutputPartOne
 

@@ -1,11 +1,6 @@
 //
 //  Day01.swift
 //  AoC-Swift-Template
-//  Forked from https://github.com/Dean151/AoC-Swift-Template
-//
-//  Created by Thomas DURAND.
-//  Follow me on Twitter @deanatoire
-//  Check my computing blog on https://www.thomasdurand.fr/
 //
 
 import Foundation
@@ -15,7 +10,6 @@ import Common
 
 @main
 struct Day01: Puzzle {
-    // TODO: Start by defining your input/output types :)
     typealias Input = String
     typealias OutputPartOne = Never
     typealias OutputPartTwo = Never
@@ -24,12 +18,6 @@ struct Day01: Puzzle {
 // MARK: - PART 1
 
 extension Day01 {
-    static var partOneExpectations: [any Expectation<Input, OutputPartOne>] {
-        [
-            // TODO: add expectations for part 1
-        ]
-    }
-
     static func solvePartOne(_ input: Input) async throws -> OutputPartOne {
         // TODO: Solve part 1 :)
         throw ExecutionError.notSolved
@@ -39,12 +27,6 @@ extension Day01 {
 // MARK: - PART 2
 
 extension Day01 {
-    static var partTwoExpectations: [any Expectation<Input, OutputPartTwo>] {
-        [
-            // TODO: add expectations for part 2
-        ]
-    }
-
     static func solvePartTwo(_ input: Input) async throws -> OutputPartTwo {
         // TODO: Solve part 2 :)
         throw ExecutionError.notSolved
