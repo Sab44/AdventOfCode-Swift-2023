@@ -19,13 +19,13 @@ struct Game: Parsable {
     let draws: [[CubeColor: Int]]
     
     static func parse(raw: String) throws -> Game {
-        let id = Int(raw.components(separatedBy: " ")[1].dropLast(1))!
-        let draws = raw.components(separatedBy: ": ")[1].components(separatedBy: "; ")
+        let id = Int(raw.split(separator: " ")[1].dropLast(1))!
+        let draws = raw.split(separator: ": ")[1].split(separator: "; ")
             .map { draw in
-                draw.components(separatedBy: ", ")
+                draw.split(separator: ", ")
                     .reduce(into: [CubeColor: Int]()) {
                         let cubeColor = CubeColor(rawValue: $1.components(separatedBy: " ")[1])!
-                        $0[cubeColor] = Int($1.components(separatedBy: " ")[0])!
+                        $0[cubeColor] = Int($1.split(separator: " ")[0])!
                 }
             }
         
