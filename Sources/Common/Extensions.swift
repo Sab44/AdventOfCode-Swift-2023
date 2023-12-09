@@ -11,6 +11,12 @@ public extension Array {
     }
 }
 
+public extension Range<Int> {
+    var lastIndex: Int {
+        return count - 1
+    }
+}
+
 public extension Collection where Element: Numeric {
     func sum() -> Element {
         return reduce(0, +)
