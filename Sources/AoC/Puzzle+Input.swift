@@ -118,3 +118,30 @@ extension Double: Parsable {
         return double
     }
 }
+
+public protocol ArrayParsable {
+    static func parseArray(raw: String) throws -> [Self]
+}
+
+extension Int: ArrayParsable {
+    public static func parseArray(raw: String) throws -> [Int] {
+        return try raw.map {
+            if let numberValue = $0.wholeNumberValue {
+                return numberValue
+            }
+            throw InputError.couldNotCast(target: Int.self)
+        }
+    }
+}
+
+extension Character: ArrayParsable {
+    public static func parseArray(raw: String) throws -> [Character] {
+        return Array(raw)
+    }
+}
+
+extension Array: Parsable where Element: ArrayParsable {
+    public static func parse(raw: String) throws -> Array<Element> {
+        return try Element.parseArray(raw: raw)
+    }
+}

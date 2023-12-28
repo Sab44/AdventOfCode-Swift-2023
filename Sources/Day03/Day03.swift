@@ -10,10 +10,6 @@ import Common
 
 @main
 struct Day03: Puzzle {
-    static func transform(raw: String) async throws -> [[Character]] {
-        return raw.components(separatedBy: .newlines).map { Array($0) }
-    }
-    
     typealias Input = [[Character]]
     typealias OutputPartOne = Int
     typealias OutputPartTwo = Int
