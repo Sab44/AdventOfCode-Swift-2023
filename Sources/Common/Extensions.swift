@@ -9,6 +9,25 @@ public extension Array {
     var lastIndex: Int {
         return endIndex - 1
     }
+    
+    func getOrNil(index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
+    
+    func plus(_ element: Element) -> Array<Element> {
+        var copy = self
+        copy.append(element)
+        return copy
+    }
+    
+    func inserted(newElement: Element, at: Int) -> Array<Element> {
+        if at >= 0 && at <= endIndex {
+            var copy = self
+            copy.insert(newElement, at: at)
+            return copy
+        }
+        return self
+    }
 }
 
 public extension Range<Int> {
