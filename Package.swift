@@ -38,6 +38,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "0.0.0"),
+        .package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "2.0.0"),
     ],
@@ -45,6 +46,7 @@ let package = Package(
         .target(name: "AoC"),
         .target(name: "Common", dependencies: [
             .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            .product(name: "Algorithms", package: "swift-algorithms"),
             .product(name: "Collections", package: "swift-collections"),
             .product(name: "Crypto", package: "swift-crypto"),
         ]),
