@@ -8,19 +8,97 @@ import Foundation
 import AoC
 import Common
 
+struct Brick: Hashable {
+    let start: Coordinate3D
+    let end: Coordinate3D
+}
+
 @main
 struct Day22: Puzzle {
-    typealias Input = String
-    typealias OutputPartOne = Never
-    typealias OutputPartTwo = Never
+    static func transform(raw: String) async throws -> [Brick] {
+        let lines = raw.components(separatedBy: .newlines)
+        
+        var bricks = [Brick]()
+        for line in lines {
+            let startC = line.split(separator: "~")[0]
+            let start = Coordinate3D(x: Int(startC.split(separator: ",")[0])!, y: Int(startC.split(separator: ",")[1])!, z: Int(startC.split(separator: ",")[2])!)
+            
+            let endC = line.split(separator: "~")[1]
+            let end = Coordinate3D(x: Int(endC.split(separator: ",")[0])!, y: Int(endC.split(separator: ",")[1])!, z: Int(endC.split(separator: ",")[2])!)
+            
+            bricks.append(Brick(start: start, end: end))
+        }
+        return bricks
+    }
+    
+    typealias Input = [Brick]
+    typealias OutputPartOne = Int
+    typealias OutputPartTwo = Int
 }
 
 // MARK: - PART 1
 
 extension Day22 {
     static func solvePartOne(_ input: Input) async throws -> OutputPartOne {
-        // TODO: Solve part 1 :)
-        throw ExecutionError.notSolved
+        let sortedByZ = input.sorted { min($0.start.z, $0.end.z) < min($1.start.z, $1.end.z) }
+        
+        let fallenBricks = try letBricksFall(bricks: sortedByZ)
+        
+        var checkDisintegration = [Brick]()
+        var safeDisintegrations = 0
+        
+        for index in fallenBricks.indices {
+            checkDisintegration = fallenBricks
+            checkDisintegration.remove(at: index)
+            
+            let disintegrated = try letBricksFall(bricks: checkDisintegration)
+            if disintegrated == checkDisintegration {
+                safeDisintegrations += 1
+            }
+            checkDisintegration = []
+        }
+        
+        return safeDisintegrations
+    }
+    
+    private static func letBricksFall(bricks: [Brick]) throws -> [Brick] {
+        var fallenBricks = [Brick]()
+        var currentBrickIndex = 0
+        while true {
+            if !bricks.indices.contains(currentBrickIndex) {
+                break
+            }
+            var currentBrick = bricks[currentBrickIndex]
+            
+            if currentBrick.start.x == currentBrick.end.x && currentBrick.start.y == currentBrick.end.y {
+                // brick is single line on z axis
+                while min(currentBrick.start.z, currentBrick.end.z) > 1  && !fallenBricks.contains(where: {
+                    max($0.start.z, $0.end.z) + 1 == min(currentBrick.start.z, currentBrick.end.z) && ($0.start.x...$0.end.x).contains(currentBrick.start.x) && ($0.start.y...$0.end.y).contains(currentBrick.start.y)
+                }) {
+                    currentBrick = Brick(start: Coordinate3D(x: currentBrick.start.x, y: currentBrick.start.y, z: currentBrick.start.z - 1), end: Coordinate3D(x: currentBrick.end.x, y: currentBrick.end.y, z: currentBrick.end.z - 1))
+                }
+            } else if currentBrick.start.x == currentBrick.end.x && currentBrick.start.z == currentBrick.end.z {
+                // brick is single line on y axis
+                while currentBrick.start.z > 1  && !fallenBricks.contains(where: {
+                    max($0.start.z, $0.end.z) + 1 == currentBrick.start.z && ($0.start.x...$0.end.x).contains(currentBrick.start.x) && ($0.start.y...$0.end.y).contains { (currentBrick.start.y...currentBrick.end.y).contains($0) }
+                }) {
+                    currentBrick = Brick(start: Coordinate3D(x: currentBrick.start.x, y: currentBrick.start.y, z: currentBrick.start.z - 1), end: Coordinate3D(x: currentBrick.end.x, y: currentBrick.end.y, z: currentBrick.end.z - 1))
+                }
+            } else if currentBrick.start.y == currentBrick.end.y && currentBrick.start.z == currentBrick.end.z {
+                // brick is single line on x axis
+                while currentBrick.start.z > 1  && !fallenBricks.contains(where: {
+                    max($0.start.z, $0.end.z) + 1 == currentBrick.start.z && ($0.start.x...$0.end.x).contains { (currentBrick.start.x...currentBrick.end.x).contains($0) } && ($0.start.y...$0.end.y).contains(currentBrick.start.y)
+                }) {
+                    currentBrick = Brick(start: Coordinate3D(x: currentBrick.start.x, y: currentBrick.start.y, z: currentBrick.start.z - 1), end: Coordinate3D(x: currentBrick.end.x, y: currentBrick.end.y, z: currentBrick.end.z - 1))
+                }
+            } else {
+                throw ExecutionError.unsolvable
+            }
+            
+            fallenBricks.append(currentBrick)
+            currentBrickIndex += 1
+        }
+        return fallenBricks
     }
 }
 
