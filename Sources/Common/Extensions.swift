@@ -30,6 +30,14 @@ public extension Array {
     }
 }
 
+public extension Set {
+    func plus(_ element: Element) -> Set<Element> {
+        var copy = self
+        copy.insert(element)
+        return copy
+    }
+}
+
 public extension Range<Int> {
     var lastIndex: Int {
         return count - 1
