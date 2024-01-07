@@ -15,6 +15,9 @@ public protocol Puzzle<Input, OutputPartOne, OutputPartTwo> {
     associatedtype OutputPartOne
     associatedtype OutputPartTwo
 
+    /// Should be implemented by generated input file for each day
+    static var input: String { get }
+    
     /// Should provide raw input for the given puzzle
     static func rawInput() async throws -> String
 

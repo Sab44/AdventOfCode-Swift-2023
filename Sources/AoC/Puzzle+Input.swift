@@ -52,10 +52,6 @@ extension Puzzle {
 }
 
 extension Puzzle {
-    static var input: String {
-        ""
-    }
-    
     /// Get the input file content as a unique string
     public static func rawInput() throws -> String {
         guard input != "" else {
