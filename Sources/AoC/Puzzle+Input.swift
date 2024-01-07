@@ -11,11 +11,14 @@
 import Foundation
 
 public enum InputError: Error, CustomStringConvertible {
+    case missingInput(day: String)
     case unexpectedInput(unrecognized: (any StringProtocol)? = nil)
     case couldNotCast(target: Any.Type)
 
     public var description: String {
         switch self {
+        case .missingInput(day: let day):
+            return "Input file for \(day) is missing, make sure to generate it with input.sh"
         case .unexpectedInput(unrecognized: let string):
             guard let string else {
                 return "Input transform encountered an unexpected substring"
@@ -49,18 +52,20 @@ extension Puzzle {
 }
 
 extension Puzzle {
-    static var inputFile: URL {
-        Bundle.main.bundleURL.appending(path: "AdventOfCode_\(self.self).bundle/Contents/Resources/input.txt")
+    static var input: String {
+        ""
     }
-
+    
     /// Get the input file content as a unique string
     public static func rawInput() throws -> String {
-        let raw = try String(contentsOf: inputFile)
+        guard input != "" else {
+            throw InputError.missingInput(day: "\(self.self)")
+        }
         switch rawInputTrimMode {
         case .none:
-            return raw
+            return input
         case .trim(set: let set):
-            return raw.trimmingCharacters(in: set)
+            return input.trimmingCharacters(in: set)
         }
     }
 }

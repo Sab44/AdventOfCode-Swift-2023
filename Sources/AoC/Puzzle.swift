@@ -16,7 +16,6 @@ public protocol Puzzle<Input, OutputPartOne, OutputPartTwo> {
     associatedtype OutputPartTwo
 
     /// Should provide raw input for the given puzzle
-    /// A default implementation are provided for when the file input.txt exists
     static func rawInput() async throws -> String
 
     /// Should transform the raw string input into the required Input
