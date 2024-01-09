@@ -9,7 +9,7 @@ import Foundation
 import AoC
 import Common
 
-struct SpringConditions: Parsable {
+struct SpringConditions: Parsable, Hashable {
     let conditions: [Character]
     let groups: [Int]
     
@@ -19,84 +19,93 @@ struct SpringConditions: Parsable {
         
         return SpringConditions(conditions: conditions, groups: groups)
     }
+    
+    var unfolded: SpringConditions {
+        let conditions = Array(repeating: self.conditions, count: 5).joined(separator: "?")
+        let groups = [[Int]](repeating: self.groups, count: 5).flatMap { $0 }
+        return SpringConditions(conditions: Array(conditions), groups: groups)
+    }
 }
 
 @main
 struct Day12: Puzzle {
     typealias Input = [SpringConditions]
     typealias OutputPartOne = Int
-    typealias OutputPartTwo = Never
+    typealias OutputPartTwo = Int
 }
 
 // MARK: - PART 1
 
 extension Day12 {
     static func solvePartOne(_ input: Input) async throws -> OutputPartOne {
-        var arrangements: [Int] = []
-        
-        var permutationMap: [Int: [String]] = [:]
-        
-        for springConditions in input {
-            
-            let unknowns = springConditions.conditions.filter { $0 == "?" }.count
-            
-            if permutationMap[unknowns] == nil {
-                let start: [Character] = Array(repeating: ".", count: unknowns)
-                var pForUnknowns: [String] = [String(start)]
-                
-                for n in 0..<unknowns {
-                    var p = start
-                    for index in 0...n {
-                        p[index] = "#"
-                    }
-                    pForUnknowns.append(String(p))
-                }
-                
-                var all: [String] = []
-                for string in pForUnknowns {
-                    let pInput: [Character] = Array(string)
-                    let uniquePermutations = pInput.uniquePermutations(ofCount: pInput.count).map { String($0) }
-                    all.append(contentsOf: uniquePermutations)
-                }
-                
-                permutationMap[unknowns] = Array(all)
-            }
-            
-            let allPermutations = permutationMap[unknowns]!
-            
-            var possibleArrangements = 0
-        outer: for possibleCondition in allPermutations {
-            var possibleArrangement = springConditions.conditions
-            
-            var questionIndex = 0
-            for questionMarkIndex in springConditions.conditions.indices.filter({ springConditions.conditions[$0] == "?" }) {
-                possibleArrangement[questionMarkIndex] = Array(possibleCondition)[questionIndex]
-                questionIndex += 1
-            }
-            let groups = possibleArrangement.split(separator: ".", omittingEmptySubsequences: true).map { Array($0).count }
-            
-            if groups.count != springConditions.groups.count {
-                continue
-            }
-            for index in groups.indices {
-                if groups[index] != springConditions.groups[index] {
-                    continue outer
-                }
-            }
-            possibleArrangements += 1
-        }
-            arrangements.append(possibleArrangements)
-        }
-        
-        return arrangements.sum()
+        return input.map { arrangements(springConditions: $0) }.reduce(0, +)
     }
+    
+    private static var cache = [SpringConditions: Int]()
+    
+    private static func arrangements(springConditions: SpringConditions) -> Int {
+           if let cached = cache[springConditions] {
+               return cached
+           } else {
+               let value = _arrangements(springConditions)
+               cache[springConditions] = value
+               return value
+           }
+       }
+
+       private static func _arrangements(_ springConditions: SpringConditions) -> Int {
+           if springConditions.groups.isEmpty {
+               return springConditions.conditions.contains("#") ? 0 : 1
+           }
+           if springConditions.conditions.isEmpty {
+               return 0
+           }
+
+           let ch = springConditions.conditions.first!
+           let group = springConditions.groups.first!
+
+           var sum = 0
+           if ch == "#" {
+               sum = pound(springConditions, group)
+           } else if ch == "." {
+               sum = dot(springConditions)
+           } else if ch == "?" {
+               sum = dot(springConditions) + pound(springConditions, group)
+           }
+
+           return sum
+       }
+
+       private static func dot(_ springConditions: SpringConditions) -> Int {
+           arrangements(springConditions: SpringConditions(conditions: Array(springConditions.conditions.dropFirst()),
+                                                           groups: springConditions.groups))
+       }
+
+       private static func pound(_ springConditions: SpringConditions, _ group: Int) -> Int {
+           let thisGroup = springConditions.conditions
+               .prefix(group)
+               .map { $0 == "?" ? "#" : $0 } // replace ? with #
+
+           if thisGroup != Array<Character>(repeating: "#", count: group) {
+               return 0
+           }
+
+           if springConditions.conditions.count == group {
+               return springConditions.groups.count == 1 ? 1 : 0
+           }
+           
+           if "?.".contains(springConditions.conditions[group]) {
+               return arrangements(springConditions: SpringConditions(conditions: Array(springConditions.conditions.dropFirst(group + 1)),
+                                                                      groups: Array(springConditions.groups.dropFirst())))
+           }
+           return 0
+       }
 }
 
 // MARK: - PART 2
 
 extension Day12 {
     static func solvePartTwo(_ input: Input) async throws -> OutputPartTwo {
-        // TODO: Solve part 2 :)
-        throw ExecutionError.notSolved
+        return input.map { arrangements(springConditions: $0.unfolded) }.reduce(0, +)
     }
 }
