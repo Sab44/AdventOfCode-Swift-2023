@@ -9,7 +9,7 @@ import AoC
 import Common
 
 struct PartSorting: Parsable {
-    struct Workflow {
+    struct Workflow: Hashable {
         let name: String
         let operations: [String]
     }
@@ -111,6 +111,7 @@ extension Day19 {
                         }
                     }
                     
+                    // no condition applied, set last workflow as next flow
                     parts[part] = operation
                 }
             }
@@ -126,9 +127,107 @@ extension Day19 {
 
 // MARK: - PART 2
 
+struct SortingPath: Hashable {
+    let currentFlow: PartSorting.Workflow
+    let conditions: [String]
+}
+
 extension Day19 {
     static func solvePartTwo(_ input: Input) async throws -> OutputPartTwo {
-        // TODO: Solve part 2 :)
-        throw ExecutionError.notSolved
+        let startNode = input.worksflows.first { $0.name == "in" }!
+        var pathStack = Stack<SortingPath>()
+        let startPath = SortingPath(currentFlow: startNode, conditions: [])
+        pathStack.push(startPath)
+        
+        var allConditions = Set<[String]>()
+        
+        while !pathStack.isEmpty {
+            let current = pathStack.pop()!
+            let operation = current.currentFlow.operations.first!
+            
+            if operation.last == "R" && operation.count > 1 {
+                // invert condition and continue
+                let rejectCondition = invertCondition(String(operation.dropLast(2)))
+                let nextWorkflow = PartSorting.Workflow(name: current.currentFlow.name,
+                                                        operations: current.currentFlow.operations.filter { $0 != operation })
+                pathStack.push(SortingPath(currentFlow: nextWorkflow, conditions: current.conditions.plus(rejectCondition)))
+            }
+            else if operation.last == "A" && operation.count > 1 {
+                // finish for this operation and continue with next
+                let condition = String(operation.dropLast(2))
+                allConditions.insert(current.conditions.plus(condition))
+                
+                let invertedCondition = invertCondition(String(operation.dropLast(2)))
+                let nextWorkflow = PartSorting.Workflow(name: current.currentFlow.name,
+                                                        operations: current.currentFlow.operations.filter { $0 != operation })
+                pathStack.push(SortingPath(currentFlow: nextWorkflow, conditions: current.conditions.plus(invertedCondition)))
+            }
+            else if operation == "A" {
+                // path finished, insert conditions
+                allConditions.insert(current.conditions)
+            }
+            else if operation == "R" {
+                // do nothing
+            }
+            // fallback is neither A nor R
+            else if !operation.contains(":") {
+                let nextWorkflow = input.worksflows.first { $0.name == operation }!
+                pathStack.push(SortingPath(currentFlow: nextWorkflow, conditions: current.conditions))
+            }
+            // operation continues to another node
+            else {
+                // 1) condition is met, go to next node
+                let condition = String(operation.split(separator: ":")[0])
+                let nextNode = String(operation.split(separator: ":")[1])
+                let nextWorkflow = input.worksflows.first { $0.name == nextNode }!
+                pathStack.push(SortingPath(currentFlow: nextWorkflow, conditions: current.conditions.plus(condition)))
+                
+                // 2) condition is not met, continue with current node
+                let invertedCondition = invertCondition(String(operation.split(separator: ":")[0]))
+                let adaptedWorkflow = PartSorting.Workflow(name: current.currentFlow.name,
+                                                           operations: current.currentFlow.operations.filter { $0 != operation })
+                pathStack.push(SortingPath(currentFlow: adaptedWorkflow, conditions: current.conditions.plus(invertedCondition)))
+            }
+        }
+        
+        var result = 0
+        let xmas: [Character] = ["x", "m", "a", "s"]
+        
+        for conditionSequence in allConditions {
+            let dict = conditionSequence.reduce(into: [Character: [String]]()) {
+                $0[$1.first!] = $0[$1.first!, default: []].plus($1)
+            }
+            
+            let upperLimit = 4001
+            var possibleValues = [Character: Range<Int>]()
+            for (key, value) in dict {
+                let upperBound = value.filter { $0.contains("<") }.map { Int($0.split(separator: "<")[1])! }.min() ?? upperLimit
+                let lowerBound = value.filter { $0.contains(">") }.map { Int($0.split(separator: ">")[1])! }.max() ?? 0
+                if upperBound <= lowerBound {
+                    throw ExecutionError.unsolvable
+                }
+                possibleValues[key] = (lowerBound + 1)..<upperBound
+            }
+            
+            xmas.filter { !possibleValues.keys.contains($0) }.forEach {
+                possibleValues[$0] = 1..<upperLimit
+            }
+            
+            result = result + possibleValues.values.map { $0.upperBound - $0.lowerBound }.reduce(1, *)
+        }
+        
+        return result
+    }
+    
+    private static func invertCondition(_ condition: String) -> String {
+        let invertedCondition: String
+        if condition.contains("<") {
+            let correctedNumber = Int(condition.split(separator: "<")[1])! - 1
+            invertedCondition = String(condition.split(separator: "<")[0]) + ">" + String(correctedNumber)
+        } else {
+            let correctedNumber = Int(condition.split(separator: ">")[1])! + 1
+            invertedCondition = String(condition.split(separator: ">")[0]) + "<" + String(correctedNumber)
+        }
+        return invertedCondition
     }
 }
