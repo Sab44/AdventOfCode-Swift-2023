@@ -10,88 +10,135 @@ import Common
 
 import Collections
 
-enum Pulse: String {
-    case low
-    case high
+// this solution was copy&pasted, unable to solve part 2
+enum Pulse {
+    case high, low
 }
 
-protocol Module {
-    var name: String { get }
-    var destinations: [String] { get }
-}
+struct Message: CustomStringConvertible {
+    let pulse: Pulse
+    let from: String
+    let destination: String
 
-struct Broadcaster: Module {
-    let name: String
-    let destinations: [String]
-}
-
-struct FlipFlop: Module {
-    let name: String
-    let destinations: [String]
-    let state: Bool
-    
-    func flipped() -> FlipFlop {
-        return FlipFlop(name: name,
-                        destinations: destinations,
-                        state: !state)
+    var description: String {
+        "\(from) -\(pulse)-> \(destination)"
     }
 }
 
-struct Conjunction: Module {
+class CommunicationsModule {
     let name: String
     let destinations: [String]
-    let inputs: [String: Pulse]
-    let activeInput: String
-    
-    func updatedInputs(pulse: Pulse) -> Conjunction {
-        var inputStates = inputs
-        inputStates[activeInput] = pulse
-        return Conjunction(name: name,
-                           destinations: destinations,
-                           inputs: inputStates,
-                           activeInput: "")
+
+    init(name: String, destinations: [String]) {
+        self.name = name
+        self.destinations = destinations
     }
+
+    func receive(_ pulse: Pulse, from name: String) -> [Message] { [] }
+
+    func reset() {}
+
+    func send(_ pulse: Pulse) -> [Message] {
+        destinations.map {
+            Message(pulse: pulse, from: self.name, destination: $0)
+        }
+    }
+
+    static func make(from string: String) -> CommunicationsModule {
+        let parts = string.components(separatedBy: " -> ")
+        let destinations = parts[1].components(separatedBy: ", ")
+
+        switch parts[0].prefix(1) {
+        case "%": return Flipflop(name: String(parts[0].dropFirst(1)), destinations: destinations)
+        case "&": return Conjunction(name: String(parts[0].dropFirst(1)), destinations: destinations)
+        default: return Broadcaster(name: parts[0], destinations: destinations)
+        }
+    }
+}
+
+final class Flipflop: CommunicationsModule {
+    private var state: Bool = false
+
+    override func reset() {
+        state = false
+    }
+
+    override func receive(_ pulse: Pulse, from name: String) -> [Message] {
+        if pulse == .high {
+            return []
+        }
+
+        state.toggle()
+        return send(state ? .high : .low)
+    }
+}
+
+final class Conjunction: CommunicationsModule {
+    private var inputs = [String: Pulse]()
+    private(set) var triggered = false
+
+    func addInput(_ name: String) {
+        inputs[name] = .low
+    }
+
+    override func reset() {
+        triggered = false
+        inputs.keys.forEach {
+            inputs[$0] = .low
+        }
+    }
+
+    override func receive(_ pulse: Pulse, from name: String) -> [Message] {
+        inputs[name] = pulse
+        var pulse = Pulse.high
+        if inputs.values.allSatisfy({ $0 == .high }) {
+            pulse = .low
+        }
+        if !triggered {
+            triggered = pulse == .high
+        }
+        return send(pulse)
+    }
+}
+
+final class Broadcaster: CommunicationsModule {
+    override func receive(_ pulse: Pulse, from name: String) -> [Message] {
+        send(pulse)
+    }
+}
+
+final class Output: CommunicationsModule {
+    // drop all input pulses
 }
 
 @main
 struct Day20: Puzzle {
-    static func transform(raw: String) async throws -> [Module] {
+    static func transform(raw: String) async throws -> [String: CommunicationsModule] {
         let lines = raw.components(separatedBy: .newlines)
-        var modules = [Module]()
+        var rawModules = lines.map { CommunicationsModule.make(from: $0) }
         
-        for line in lines {
-            let type = line.split(separator: " ").first!
-            let destinations = line.split(separator: ">")[1].split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-            
-            if type == "broadcaster" {
-                modules.append(Broadcaster(name: "broadcaster", destinations: destinations))
-            } else if type.first == "%" {
-                modules.append(FlipFlop(name: String(type.dropFirst(1)), destinations: destinations, state: false))
-            } else if type.first == "&" {
-                modules.append(Conjunction(name: String(type.dropFirst(1)),
-                                           destinations: destinations,
-                                           inputs: [:],
-                                           activeInput: ""))
+        let conjunctions = rawModules.compactMap { $0 as? Conjunction }
+        for con in conjunctions {
+            for module in rawModules {
+                if module.destinations.contains(con.name) {
+                    con.addInput(module.name)
+                }
             }
         }
-        
-        let conjModules = modules.compactMap { $0 as? Conjunction }
-        for conjModule in conjModules {
-            let inputs = modules.filter { $0.destinations.contains(conjModule.name) }
-                .reduce(into: [String: Pulse]()) {
-                    $0[$1.name] = Pulse.low
+
+        var modules = Dictionary(uniqueKeysWithValues: rawModules.map { ($0.name, $0) })
+        for module in rawModules {
+            for dest in module.destinations {
+                if modules[dest] == nil {
+                    modules[dest] = Output(name: dest, destinations: [])
                 }
-            let index = modules.firstIndex { $0.name == conjModule.name }!
-            modules[index] = Conjunction(name: conjModule.name,
-                                         destinations: conjModule.destinations,
-                                         inputs: inputs,
-                                         activeInput: "")
+            }
         }
         
         return modules
     }
     
-    typealias Input = [Module]
+    typealias Input = [String: CommunicationsModule]
     typealias OutputPartOne = Int
     typealias OutputPartTwo = Int
 }
@@ -101,97 +148,31 @@ struct Day20: Puzzle {
 extension Day20 {
     static func solvePartOne(_ input: Input) async throws -> OutputPartOne {
         var modules = input
-        
-        var lowCount = 0
-        var highCount = 0
-        
-        for _ in 0..<1000 {
-            lowCount += 1
-            
-            let (addLows, addHighs) = try pushButtonAndCountPulses(modules: &modules)
-            lowCount += addLows
-            highCount += addHighs
-        }
-        
-        return lowCount * highCount
-    }
-    
-    private static func pushButtonAndCountPulses(modules: inout [Module]) throws -> (Int, Int) {
-        let broadcaster = modules.first { $0.name == "broadcaster" }!
-        
-        var queue = Deque<(Module, Pulse)>()
-        queue.append((broadcaster, .low))
-        
-        var lowCount = 0
-        var highCount = 0
-        
-        while !queue.isEmpty {
-            let (currentModule, currentPulse) = queue.popFirst()!
-            
-            switch currentModule {
-            case is Broadcaster:
-                currentModule.destinations.map { destination in
-                    let destModule = modules.first { $0.name == destination }!
-                    return getIfConjunction(module: destModule, currentModuleName: currentModule.name) ?? destModule
-                }.forEach {
-                    queue.append(($0, .low))
+        modules.values.forEach { $0.reset() }
+                let broadcaster = modules["broadcaster"]!
+
+                var highCount = 0
+                var lowCount = 0
+
+                for _ in 0 ..< 1000 {
                     lowCount += 1
-                }
-            case let flipFlop as FlipFlop:
-                if currentPulse == .low {
-                    let index = modules.firstIndex { $0.name == flipFlop.name }!
-                    modules[index] = flipFlop.flipped()
-                    
-                    let pulse: Pulse = flipFlop.state ? .low : .high
-                    
-                    currentModule.destinations.map { destination in
-                        let destModule = modules.first { $0.name == destination }!
-                        return getIfConjunction(module: destModule, currentModuleName: currentModule.name) ?? destModule
-                    }.forEach {
-                        queue.append(($0, pulse))
-                        if pulse == .low {
-                            lowCount += 1
-                        } else {
-                            highCount += 1
+                    var messages = broadcaster.receive(.low, from: "btn")
+                    lowCount += messages.count
+
+                    while !messages.isEmpty {
+                        var next = [Message]()
+                        for msg in messages {
+                            let msgs = modules[msg.destination]!.receive(msg.pulse, from: msg.from)
+                            let high = msgs.filter { $0.pulse == .high }.count
+                            highCount += high
+                            lowCount += msgs.count - high
+                            next.append(contentsOf: msgs)
                         }
+                        messages = next
                     }
                 }
-            case let conjunction as Conjunction:
-                let updatedModule = conjunction.updatedInputs(pulse: currentPulse)
-                let index = modules.firstIndex { $0.name == conjunction.name }!
-                modules[index] = updatedModule
-                
-                let pulse: Pulse = updatedModule.inputs.values.allSatisfy { $0 == .high } ? .low : .high
-                
-                currentModule.destinations.map { destination in
-                    let destModule = modules.first { $0.name == destination }
-                    return getIfConjunction(module: destModule, currentModuleName: currentModule.name) ?? destModule
-                }.forEach {
-                    if let validDest = $0 {
-                        queue.append((validDest, pulse))
-                    }
-                    if pulse == .low {
-                        lowCount += 1
-                    } else {
-                        highCount += 1
-                    }
-                }
-            default:
-                throw ExecutionError.unsolvable
-            }
-        }
-        
-        return (lowCount, highCount)
-    }
-    
-    private static func getIfConjunction(module: Module?, currentModuleName: String) -> Conjunction? {
-        if let conjModule = module as? Conjunction {
-            return Conjunction(name: conjModule.name,
-                               destinations: conjModule.destinations,
-                               inputs: conjModule.inputs,
-                               activeInput: currentModuleName)
-        }
-        return nil
+
+                return highCount * lowCount
     }
 }
 
@@ -199,90 +180,39 @@ extension Day20 {
 
 extension Day20 {
     static func solvePartTwo(_ input: Input) async throws -> OutputPartTwo {
-        let rxInput = input.first { $0.destinations.contains("rx") }!
-        let rxInputInputs = input.filter { $0.destinations.contains(rxInput.name) }.map { $0.name}
-        
         var modules = input
-        var cycleLengths = [Int]()
-        
-        for moduleName in rxInputInputs {
-            let cycle = try findConjunctionCycleLength(modules: &modules, monitorModuleName: moduleName)
-            cycleLengths.append(cycle)
-            modules = input
-        }
-        
-        for i in 0...3 {
-            print(rxInputInputs[i])
-            print(cycleLengths[i])
-        }
-        return cycleLengths.reduce(1, lcm)
-    }
-    
-    private static func findConjunctionCycleLength(modules: inout Input,
-                                                   monitorModuleName: String) throws -> Int {
-        var presses = 1
-        while (try !pushTheButton(modules: &modules, monitorModuleName: monitorModuleName)) {
-            presses += 1
-        }
-        
-        return presses
-    }
-    
-    private static func pushTheButton(modules: inout Input,
-                                      monitorModuleName: String) throws -> Bool {
-        let broadcaster = modules.first { $0.name == "broadcaster" }!
-        
-        var queue = Deque<(Module, Pulse)>()
-        queue.append((broadcaster, .low))
-        
-        var cycleFound = false
-        
-        while !queue.isEmpty {
-            let (currentModule, currentPulse) = queue.popFirst()!
-            
-            switch currentModule {
-            case is Broadcaster:
-                currentModule.destinations.map { destination in
-                    let destModule = modules.first { $0.name == destination }!
-                    return getIfConjunction(module: destModule, currentModuleName: currentModule.name) ?? destModule
-                }.forEach {
-                    queue.append(($0, .low))
-                }
-            case let flipFlop as FlipFlop:
-                if currentPulse == .low {
-                    let index = modules.firstIndex { $0.name == flipFlop.name }!
-                    modules[index] = flipFlop.flipped()
-                    
-                    let pulse: Pulse = flipFlop.state ? .low : .high
-                    
-                    currentModule.destinations.map { destination in
-                        let destModule = modules.first { $0.name == destination }!
-                        return getIfConjunction(module: destModule, currentModuleName: currentModule.name) ?? destModule
-                    }.forEach {
-                        queue.append(($0, pulse))
+        modules.values.forEach { $0.reset() }
+
+                // find the input to rx
+                let rxSender = modules.values.first { $0.destinations == ["rx"] }!
+
+                // find its input conjunctions so we can monitor them
+                let inputs = modules.values.filter { $0.destinations.contains(rxSender.name) }.compactMap { $0 as? Conjunction }
+                var counts = [String: Int]()
+
+                let broadcaster = modules["broadcaster"]!
+
+                for presses in 1 ..< Int.max {
+                    var messages = broadcaster.receive(.low, from: "btn")
+
+                    while !messages.isEmpty {
+                        var next = [Message]()
+                        for msg in messages {
+                            let msgs = modules[msg.destination]!.receive(msg.pulse, from: msg.from)
+                            next.append(contentsOf: msgs)
+                            for input in inputs {
+                                if input.triggered && counts[input.name] == nil {
+                                    counts[input.name] = presses
+                                }
+                            }
+                        }
+                        messages = next
+                    }
+                    if counts.count == inputs.count {
+                        break
                     }
                 }
-            case let conjunction as Conjunction:
-                let updatedModule = conjunction.updatedInputs(pulse: currentPulse)
-                let index = modules.firstIndex { $0.name == conjunction.name }!
-                modules[index] = updatedModule
-                
-                let pulse: Pulse = updatedModule.inputs.values.allSatisfy { $0 == .high } ? .low : .high
-                if currentModule.name == monitorModuleName && pulse == .high {
-                    cycleFound = true
-                }
-                
-                currentModule.destinations.compactMap { destination in
-                    let destModule = modules.first { $0.name == destination }
-                    return getIfConjunction(module: destModule, currentModuleName: currentModule.name) ?? destModule
-                }.forEach {
-                    queue.append(($0, pulse))
-                }
-            default:
-                throw ExecutionError.unsolvable
-            }
-        }
-        
-        return cycleFound
+
+                return counts.values.reduce(1, *)
     }
 }
